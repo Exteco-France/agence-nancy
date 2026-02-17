@@ -212,6 +212,23 @@
         .plat-metric .lbl{font-size:9.5px;color:var(--text-tertiary);text-transform:uppercase;font-weight:700;letter-spacing:.3px}
         .plat-metric .val{font-size:17px;font-weight:800;margin-top:2px}
 
+        /* ══ VISIBILITY BANNER ══ */
+        .vis-banner{background:var(--bg-card);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;position:relative;overflow:hidden}
+        .vis-banner::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#fbbc04,#1877f2,#e1306c)}
+        .vis-banner-title{font-size:12px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px}
+        .vis-grid{display:flex;gap:24px;flex-wrap:wrap}
+        .vis-item{display:flex;align-items:center;gap:12px;flex:1;min-width:180px}
+        .vis-icon{width:40px;height:40px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .vis-icon svg{width:18px;height:18px}
+        .vis-icon.ggl{background:rgba(251,188,4,0.1);color:#fbbc04}
+        .vis-icon.fb{background:rgba(24,119,242,0.1);color:#1877f2}
+        .vis-icon.ig{background:rgba(225,48,108,0.1);color:#e1306c}
+        .vis-val{font-size:20px;font-weight:800;color:var(--text-primary);line-height:1.1}
+        .vis-sub{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+        .vis-stars{display:flex;gap:1px;margin-top:3px}
+        .vis-stars svg{width:12px;height:12px;color:#fbbc04;fill:#fbbc04}
+        .vis-stars svg.empty{fill:none;color:rgba(251,188,4,0.3)}
+
         /* ══ OVERLAY / MOBILE ══ */
         .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99}
         .sidebar-overlay.show{display:block}
@@ -369,6 +386,7 @@
              ═══════════════════════════════════════ -->
         <div class="page-view active" id="page-overview">
             <div class="page-header"><div class="header-row"><div><h2>Vue d'ensemble</h2><p>Exteco Nancy &bull; Donn&eacute;es en temps r&eacute;el depuis Supermetrics</p></div><div class="header-actions"><button class="btn btn-outline" onclick="location.reload()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Actualiser</button></div></div></div>
+            <div class="vis-banner" id="visBanner" style="display:none"><div class="vis-banner-title">Visibilit&eacute; digitale</div><div class="vis-grid" id="visGrid"></div></div>
             <div class="platform-tabs"><button class="platform-tab active" onclick="switchPlatform('all',this)"><span class="tab-dot all"></span>Toutes</button><button class="platform-tab" onclick="switchPlatform('meta',this)"><span class="tab-dot meta"></span>Meta Ads</button><button class="platform-tab" onclick="switchPlatform('google',this)"><span class="tab-dot google"></span>Google Ads</button></div>
             <div class="kpi-grid" id="kpiGrid"></div>
             <div class="grid-1-1"><div class="card"><div class="card-header"><div><div class="card-title">&Eacute;volution des d&eacute;penses</div><div class="card-subtitle">D&eacute;penses mensuelles Meta vs Google</div></div><div class="chart-legend"><div class="legend-item"><span class="legend-dot" style="background:var(--meta-blue)"></span>Meta</div><div class="legend-item"><span class="legend-dot" style="background:var(--google-blue)"></span>Google</div></div></div><div class="chart-container"><canvas id="spendChart"></canvas></div></div><div class="card"><div class="card-header"><div><div class="card-title">Actions mensuelles</div><div class="card-subtitle">Conversions &amp; Leads</div></div><div class="chart-legend"><div class="legend-item"><span class="legend-dot" style="background:var(--meta-blue)"></span>Meta</div><div class="legend-item"><span class="legend-dot" style="background:var(--google-blue)"></span>Google</div></div></div><div class="chart-container"><canvas id="convChart"></canvas></div></div></div>
@@ -881,6 +899,32 @@ function toggleSidebar(){document.getElementById('sidebar').classList.toggle('op
 document.getElementById('sidebarOverlay').addEventListener('click',toggleSidebar);
 
 init();
+
+/* ══ VISIBILITÉ DIGITALE ══ */
+const VIS_AGENCY='Nancy';
+(async function loadVisibility(){
+    const base=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=`;
+    try{
+        const[gRes,sRes]=await Promise.all([fetch(base+'556106137').then(r=>r.text()),fetch(base+'1489889154').then(r=>r.text())]);
+        const gData=parseCSV(gRes),sData=parseCSV(sRes);
+        const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
+        const an=norm(VIS_AGENCY);
+        const gRow=gData.find(r=>{const n=norm(r['Agence']||'');return n===an||n.includes(an)||an.includes(n)});
+        let sRow=sData.find(r=>{const n=norm(r['Agence']||'');return n===an||n.includes(an)||an.includes(n)});
+        if(!sRow){for(const r of sData){const n=norm(r['Agence']||'');if(n.includes('epinal')||n.includes('nancy')){sRow=r;break}}}
+        if(!gRow&&!sRow)return;
+        const rating=gRow?parseFloat((gRow['Note Google']||'0').replace(',','.')):0;
+        const reviews=gRow?parseInt(gRow["Nombre d'avis"]||'0'):0;
+        const fb=sRow?(sRow['Followers FB']||'—'):'—';
+        const ig=sRow?(sRow['Followers IG']||'—'):'—';
+        const star='<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+        const starE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="empty"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+        let stars='';if(rating){const f=Math.floor(rating),h=rating-f>=0.4;for(let i=0;i<f;i++)stars+=star;if(h)stars+=star;for(let i=0;i<5-f-(h?1:0);i++)stars+=starE}
+        const grid=document.getElementById('visGrid');
+        grid.innerHTML=`<div class="vis-item"><div class="vis-icon ggl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><path d="m9 12 2 2 4-4"/></svg></div><div><div class="vis-val">${rating?rating.toFixed(1).replace('.',','):'—'}<span style="font-size:13px;font-weight:500;color:var(--text-tertiary)"> / 5</span></div><div class="vis-stars">${stars}</div><div class="vis-sub">${reviews} avis Google</div></div></div><div class="vis-item"><div class="vis-icon fb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></div><div><div class="vis-val">${fb}</div><div class="vis-sub">Followers Facebook</div></div></div><div class="vis-item"><div class="vis-icon ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg></div><div><div class="vis-val">${ig}</div><div class="vis-sub">Followers Instagram</div></div></div>`;
+        document.getElementById('visBanner').style.display='';
+    }catch(e){console.error('Visibility:',e)}
+})();
 </script>
 </body>
 </html>

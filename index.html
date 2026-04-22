@@ -530,6 +530,8 @@ const SHEET_ID='1mSOSiNi_gU-TX560saphbV_eKWh08I5h78m1gwx1JGg';
 const META_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=992684069`;
 const LEADGEN_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=1358117115`;
 const GOOGLE_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=2018411226`;
+const MANUAL_LEADS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSFIG7LgM2XIcdzBg8g0-aS5gjwvxuUzUT4sx8UncVDVnnOOxJNwPXFgh7DB5BBjXiLc9DL11HrXevw/pub?output=csv&single=true&gid=929495414';
+const MANUAL_LEADS_AGENCE = 'Nancy';
 
 Chart.defaults.font.family="'Plus Jakarta Sans','Inter',sans-serif";
 Chart.defaults.color='#8a8a8a';
@@ -623,12 +625,60 @@ function updateDateDisplay(){
     }
 }
 
+// ══ MANUAL LEADS ══
+async function loadManualLeads() {
+    try {
+        const resp = await fetch(MANUAL_LEADS_URL);
+        const text = await resp.text();
+        const lines = text.replace(/\r\n/g, '\n').split('\n');
+        let count = 0;
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const fields = [];
+            let cur = '', q = false;
+            for (let j = 0; j < lines[i].length; j++) {
+                const c = lines[i][j];
+                if (c === '"') q = !q;
+                else if (c === ',' && !q) { fields.push(cur.trim()); cur = ''; }
+                else cur += c;
+            }
+            fields.push(cur.trim());
+
+            const agence = fields[1] || '';
+            const norm = agence.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const target = MANUAL_LEADS_AGENCE.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (!norm.includes(target) && !target.includes(norm)) continue;
+
+            let dateStr = fields[0] || '';
+            if (dateStr.includes('/')) {
+                const parts = dateStr.split('/');
+                dateStr = parts[2] + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
+            }
+
+            allMD.push({
+                p: 'meta',
+                campType: 'conversion',
+                camp: 'Leads manuels (rattrapage)',
+                ad: fields[5] || 'Formulaire site',
+                dt: dateStr,
+                imp: 0, cl: 0, cost: 0, ctr: 0, conv: 1, leads: 0, cpc: 0,
+                manual: true
+            });
+            count++;
+        }
+        if (count > 0) console.log('[EXTECO] ' + count + ' leads manuels integres pour ' + MANUAL_LEADS_AGENCE);
+    } catch (e) {
+        console.warn('[EXTECO] Erreur leads manuels:', e);
+    }
+}
+
 // ══ INIT ══
 async function init(){
     let mOk=false,gOk=false,lgOk=false;
     try{const raw=await fetchCSV(META_URL);const convData=raw.map(mapM).filter(r=>r.dt);mOk=convData.length>0;allMD=convData}catch(e){console.error('Meta:',e)}
     try{const raw=await fetchCSV(LEADGEN_URL);const lgData=raw.map(mapLG).filter(r=>r.dt);lgOk=lgData.length>0;allMD=[...allMD,...lgData]}catch(e){console.error('LeadGen:',e)}
     try{const raw=await fetchCSV(GOOGLE_URL);allGD=raw.map(mapG).filter(r=>r.dt);gOk=allGD.length>0}catch(e){console.error('Google:',e)}
+    await loadManualLeads();
 
     // Status — error only
     const st=document.getElementById('dataStatus');
